@@ -1,0 +1,69 @@
+<html>
+<head>
+    <title>Sum of squares decomposition 🧮‍</title>
+    <link rel="stylesheet" media="screen" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+        TeX: {equationNumbers: {autoNumber: "AMS" },
+        extensions: ["AMSmath.js", "AMSsymbols.js", "autobold.js", "color.js"]}});
+
+
+    </script>
+    <script type="text/javascript" async
+            src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+</head>
+
+<body>
+<div class="container"><br>
+    <h2>Sums of squares decomposition 🧮️</h2>
+</div>
+
+
+<div class=container"><br>
+    <div class="row align-items-center justify-content-center">
+        <div class="col-md-4">
+            <form action="" method="post" role="form">
+                {{ form.csrf }}
+                <div class="form-group">
+                    <input type="text" class="form-control" id="polynomial" name="polynomial"
+                           placeholder="enter polynomial, e.g. x**2+2*x+1">
+                </div>
+                <br>
+                <button type="submit" class="btn btn-success">Decompose it!</button>
+            </form>
+            <br>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for message in messages %}
+                        {% if "Error" not in message[1]: %}
+                            <div class="alert alert-info">
+                                <strong>Result:</strong> {{ message[1] }}
+                            </div>
+                        {% endif %}
+                        {% if "Error" in message[1]: %}
+                            <div class="alert alert-danger">
+                                <strong>Error: </strong> {{ message[1] }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        <br>
+    </div>
+</div>
+
+<div class="container" font-size="50%">
+    <p>
+        <strong>Instructions</strong>. Enter a polynomial to get an exact decomposition as a sum of squares of rational functions, modulo symbolic
+        simplifications, if one can be found.<br>
+        <strong>Created</strong> by <a href="https://www.linkedin.com/in/thanos-papa%C3%AFoannou-41060245/">Thanos Papaïoannou</a>.<br>
+        <strong>Fork</strong> on <a href="https://github.com/thanosdpapaioannou/decompoly">GitHub</a>.
+    </p>
+</div>
+
+</body>
+</html>

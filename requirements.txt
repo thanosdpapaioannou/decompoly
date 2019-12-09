@@ -1,0 +1,8 @@
+sympy
+numpy
+scipy
+cvxopt
+Flask
+wtforms
+gunicorn
+numba
