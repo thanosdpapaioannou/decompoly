@@ -9,7 +9,7 @@ Code and maths described in greater detail in paper [Description of decompoly](h
 The mathematical explanation is that olympiad inequalities are special cases of the problem of trying to prove a given polynomial is non-negative, which follows from [Artin's proof of Hilbert's 17th problem](https://link.springer.com/article/10.1007%2FBF02952513) that every real non-negative polynomial has an expression as a SOSRF with real coefficients. To solve OpenAI's problem, one just needs an effective / algorithmic version of Artin's proof, which `decompoly` provides for a large set of polynomials.
 
 Indeed, the vast majority of olympiad inequality problem ask that we prove that a given inequality involving rational functions in multiple variables `x, y, z,…` holds for all real and non-negative `x, y, z,…`. Such a problem reduces to a problem of proving a polynomial in `X, Y, Z,…` is non-negative for all real values of variables `X, Y, Z,…` via the following steps:
-- replace each variable by its square, e.g. `x` by `X:= x**2`, so that `x ≥ 0` is automatic if `X` is real; 
+- replace each variable by its square, e.g. `x` by `X:= x**2`, so that `X ≥ 0` is automatic if `x` is real; 
 - collect all terms on left-hand-side and clear denominators so the left-hand-side is a polynomial `p(X, Y, Z,…)` we need to compare to `0`;
 - multiply by `-1` if necessary to make the inequality of the form `p(X, Y, Z,…) ≥ 0`.
 
