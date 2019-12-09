@@ -15,7 +15,7 @@ Indeed, the vast majority of olympiad inequality problem ask that we prove that 
 
 ## Example
 Inputting the Motzkin polynomial `1 + x**2*y**2*(x**2 + y**2) - 3*x**2*y**2` in the 
-[Heroku app](https://secure-shelf-02448.herokuapp.com/) running off decompoly gives the following simplified decomposition, which also proves that the Motzkin polynomial is non-negative for all real values of `x` and `y`. Multiplying the numerator and denominator on the right-hand side with `x**2 + y**2 + 1` and distributing is the unsimplified decomposition as a SOSRF.
+[Heroku app](https://decompoly.herokuapp.com/) running off decompoly gives the following simplified decomposition, which also proves that the Motzkin polynomial is non-negative for all real values of `x` and `y`. Multiplying the numerator and denominator on the right-hand side with `x**2 + y**2 + 1` and distributing is the unsimplified decomposition as a SOSRF.
 
 ![decompoly screenshot](decompoly_screenshot_20191208.png "Motzkin polynomial decomposition")
 
