@@ -1,7 +1,7 @@
 from flask import Flask, render_template, flash, request
 from wtforms import Form, StringField, validators
 from decompoly import get_sos
-from sympy import poly, latex, sympify, nan, GeneratorsNeeded
+from sympy import poly, latex, sympify, nan
 
 DEBUG = True
 app = Flask(__name__)
@@ -22,7 +22,7 @@ def get_latex_from_poly(polynomial):
 def is_input_polynomial(input):
     try:
         _polynomial = poly(input)
-    except GeneratorsNeeded:
+    except:
         return False
     return True
 
