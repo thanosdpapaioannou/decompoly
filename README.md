@@ -1,5 +1,5 @@
 # decompoly
-Code and maths described in greater detail in paper [Description of decompoly](https://github.com/thanosdpapaioannou/decompoly/blob/master/description_of_decompoly.pdf).
+Code and maths described in greater detail in paper [Description of decompoly](description_of_decompoly.pdf).
 
 `decompoly` takes as input a polynomial in one or several variables with rational coefficients, and attempts to output an exact decomposition of the polynomial as a sum of squares of rational functions (SOSRF) with rational coefficients, modulo symbolic simplifications. 
 
@@ -19,7 +19,7 @@ Inputting the Motzkin polynomial `1 + x**2*y**2*(x**2 + y**2) - 3*x**2*y**2` in 
 
 ![decompoly screenshot](decompoly_screenshot_20191208.png "Motzkin polynomial decomposition")
 
-For a list of other non-negative polynomials `decompoly` can decompose, look at the suite of [unit tests](https://github.com/thanosdpapaioannou/decompoly/blob/master/test_get_sos.py).
+For a list of other non-negative polynomials `decompoly` can decompose, look at the suite of [unit tests](test_get_sos.py).
 
 
 ## App
