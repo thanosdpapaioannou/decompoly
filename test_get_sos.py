@@ -26,7 +26,7 @@ class TestGet_sos(TestCase):
         self.assertAlmostEqual(num, num_)
         self.assertAlmostEqual(denom, denom_)
 
-    def test_get_rational_approximation_one_0_to_1_4(self):
+    def test_get_rational_approximation_one_4(self):
         a = 1.5
         max_denom = 3
         num, denom = get_rational_approximation_one(a, max_denom=max_denom)

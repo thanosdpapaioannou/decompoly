@@ -38,7 +38,7 @@ def np_amin(arr, axis):
 @nb.njit
 def get_lattice_pts_in_prism(mat):
     """
-    :param mat: matrix matrix of row vectors with integer entries.
+    :param mat: matrix of row vectors with integer entries.
     :return: matrix whose rows are all integer lattice points in the smallest rectangular prism
     containing the points of mat.
     """
@@ -310,7 +310,6 @@ def get_rational_approximation(mat, max_denom):
     array = np.array(mat)
     rationals = np.zeros_like(mat, dtype=Fraction)
     for (i, j), a in np.ndenumerate(array):
-        # rationals[i, j] = Fraction.from_float(a).limit_denominator(max_denom)
         num, denom = get_rational_approximation_one(a, max_denom)
         rationals[i, j] = Fraction(num, denom)
     return rationals
