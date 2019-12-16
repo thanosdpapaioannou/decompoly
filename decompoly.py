@@ -314,6 +314,22 @@ def get_rational_approximation(mat, max_denom):
         rationals[i, j] = Fraction(num, denom)
     return rationals
 
+# TODO: this vectorised version doesn't work because of Numba errors, although it's more elegant than get_rational_approximation
+# from functools import partial
+#
+#
+# def get_rational_approximation(mat, max_denom):
+#     """
+#     :param mat: matrix of floats
+#     :param max_denom: positive integer
+#     :return: np.ndarray of Fractions which are the best rational approximations to the entries of mat with denominator
+#     bounded by max_denom.
+#     """
+#
+#     _rationals = map(partial(get_rational_approximation_one, max_denom=max_denom), mat)
+#     rationals = np.array([Fraction(_l[0], _l[1]) for _l in _rationals])
+#     return rationals
+
 
 @nb.njit
 def get_explicit_rep_objective(sym_matrix_list):
