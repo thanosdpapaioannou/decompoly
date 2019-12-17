@@ -616,7 +616,7 @@ def form_num_gram_mat(basis_matrices, sol_vec_numerical):
     return gram_mat
 
 
-def get_poly_multiplier(poly):
+def get_special_sos_multiplier(poly):
     """
     :param poly: sympy polynomial
     :return: factorisation of poly
@@ -679,7 +679,7 @@ def get_sos(polynomial, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_
         _status = 'Exact SOS decomposition found.'
         sos = coeff_leading * max_even_divisor
     else:
-        _mult = get_poly_multiplier(remainder)
+        _mult = get_special_sos_multiplier(remainder)
         for r in range(max_mult_power):
             print(f'Trying multiplier power: {r}')
             status_, sos_ = get_sos_helper(poly=(_mult ** r * remainder).as_poly(), eig_tol=eig_tol, epsilon=epsilon)

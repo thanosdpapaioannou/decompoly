@@ -19,7 +19,7 @@ Inputting the Motzkin polynomial `1 + x**2*y**2*(x**2 + y**2) - 3*x**2*y**2` in 
 
 ![decompoly screenshot](decompoly_screenshot_20191208.png "Motzkin polynomial decomposition")
 
-For a list of other non-negative polynomials `decompoly` can decompose, look at the suite of [unit tests](tests/test_get_sos.py).
+For a list of other non-negative polynomials `decompoly` can decompose, look at the suite of [unit tests](tests/test.py).
 
 
 ## App
