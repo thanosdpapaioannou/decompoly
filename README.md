@@ -1,5 +1,5 @@
 # decompoly
-Code and maths described in greater detail in paper [Description of decompoly](docs/description_of_decompoly.pdf).
+Code and maths described in greater detail in [Overview of decompoly](docs/overview_of_decompoly.pdf).
 
 `decompoly` takes as input a polynomial in one or several variables with rational coefficients, and attempts to output an exact decomposition of the polynomial as a sum of squares of rational functions (SOSRF) with rational coefficients, modulo symbolic simplifications. 
 
