@@ -43,20 +43,19 @@ def get_lattice_pts_in_prism(mat):
     containing the points of mat.
     """
 
-    size_vector = (np_amax(mat, axis=0) - np_amin(mat, axis=0) + 1).astype(np.int64)
-    prod_vec = np.ones(size_vector.shape[0], dtype=np.int64)
-    prod = 1
-    for i in range(size_vector.shape[0]):
-        prod *= size_vector[i]
-        prod_vec[i] = prod
+    n = mat.shape[1]
+    column_min = np_amin(mat, axis=0)
+    size_vector = (np_amax(mat, axis=0) - column_min + 1).astype(np.int64)
+    prod_vec = np.cumprod(size_vector)
+    prod = prod_vec[-1]
 
-    _lattice_pts = np.zeros((prod, size_vector.shape[0]), dtype=np.int64)
-    add_vec = np.zeros(size_vector.shape[0], dtype=np.int64)
+    _lattice_pts = np.zeros((prod, n), dtype=np.int64)
+    add_vec = np.zeros(n, dtype=np.int64)
     for i in range(prod):
         add_vec[0] = i % prod_vec[0]
-        for j in range(1, size_vector.shape[0]):
+        for j in range(1, n):
             add_vec[j] = np.int64(i / prod_vec[j - 1]) % size_vector[j]
-        _lattice_pts[i] = np_amin(mat, axis=0) + add_vec
+        _lattice_pts[i] = column_min + add_vec
     return _lattice_pts
 
 
