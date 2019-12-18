@@ -1,4 +1,4 @@
-from sympy import expand, Matrix, nan, factor_list, degree_list
+from sympy import expand, Matrix, nan, degree_list
 from cvxopt import matrix, solvers, spmatrix
 from scipy.spatial import ConvexHull
 import numpy as np
@@ -6,57 +6,12 @@ from scipy.linalg import null_space, orth, eigvalsh
 from fractions import Fraction
 import numba as nb
 
+from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices
+from src.poly import get_special_sos_multiplier, get_max_even_divisor
+from src.util import get_rational_approximation, sym_coeff
+
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
-
-
-@nb.njit
-def np_apply_along_axis(func1d, axis, arr):
-    assert arr.ndim == 2
-    assert axis in [0, 1]
-    if axis == 0:
-        result = np.empty(arr.shape[1])
-        for i in range(len(result)):
-            result[i] = func1d(arr[:, i])
-    else:
-        result = np.empty(arr.shape[0])
-        for i in range(len(result)):
-            result[i] = func1d(arr[i, :])
-    return result
-
-
-@nb.njit
-def np_amax(arr, axis):
-    return np_apply_along_axis(np.amax, axis, arr)
-
-
-@nb.njit
-def np_amin(arr, axis):
-    return np_apply_along_axis(np.amin, axis, arr)
-
-
-@nb.njit
-def get_lattice_pts_in_prism(mat):
-    """
-    :param mat: matrix of row vectors with integer entries.
-    :return: matrix whose rows are all integer lattice points in the smallest rectangular prism
-    containing the points of mat.
-    """
-
-    n = mat.shape[1]
-    column_min = np_amin(mat, axis=0)
-    size_vector = (np_amax(mat, axis=0) - column_min + 1).astype(np.int64)
-    prod_vec = np.cumprod(size_vector)
-    prod = prod_vec[-1]
-
-    _lattice_pts = np.zeros((prod, n), dtype=np.int64)
-    add_vec = np.zeros(n, dtype=np.int64)
-    for i in range(prod):
-        add_vec[0] = i % prod_vec[0]
-        for j in range(1, n):
-            add_vec[j] = np.int64(i / prod_vec[j - 1]) % size_vector[j]
-        _lattice_pts[i] = column_min + add_vec
-    return _lattice_pts
 
 
 def get_pts_in_cvx_hull(mat, tolerance=1e-03):
@@ -122,52 +77,6 @@ def constr_eq_compat(poly_ind, sqroot_monoms):
 
 
 @nb.njit
-def form_constraint_eq_matrices(mat, mat_other):
-    """
-    :param mat: matrix whose rows are integer vectors.
-    :param mat_other: matrix whose rows are integer vectors.
-    :return: list of sparse, symmetric matrices, one for each row of mat,
-    with size the number of rows of mat_other,
-    having a 1 in the entry indexed by (beta,beta') if beta + beta' = alpha,
-    and 0 otherwise.
-    """
-
-    _mat = []
-    for i in range(mat.shape[0]):
-        mat_i = np.zeros((mat_other.shape[0], mat_other.shape[0]))
-        point_count = 0
-        for j in range(mat_other.shape[0]):
-            for k in range(j, mat_other.shape[0]):
-                if np.all(mat[i] == (mat_other[j] + mat_other[k])):
-                    mat_i[j, k] = 1
-                    mat_i[k, j] = 1
-                    point_count += 1
-        if point_count > 0:
-            _mat.append(mat_i)
-    return _mat
-
-
-def get_coeffs(poly):
-    """
-    :param poly: multivariable sympy poly
-    :return: vector of coefficients, including zeros for all multi-indices
-    in the convex hull of multi-indices appearing in poly.
-    Includes case where multi-indices in poly have less than full-dimensional
-    convex hull.
-    """
-
-    indices = np.array(list(poly.as_poly().as_dict().keys()))
-    mat = get_pts_in_cvx_hull(indices)
-    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
-    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
-    coeff_vec = np.zeros(num_nontriv_eq)
-    for i in range(num_nontriv_eq):
-        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
-            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
-    return coeff_vec
-
-
-@nb.njit
 def form_sdp_constraint_dense(matrix_list):
     """
     :param matrix_list: list of matrices
@@ -211,14 +120,6 @@ def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
     return constraints
 
 
-@nb.njit
-def sym_coeff(x, y):
-    if x == y:
-        return 1
-    else:
-        return 2
-
-
 def get_explicit_form_basis(monoms, sqroot_monoms, poly):
     """
     :param monoms:
@@ -253,81 +154,6 @@ def get_explicit_form_basis(monoms, sqroot_monoms, poly):
         # make gram_mats_sym[i] symmetric by accessing only upper-triang elts, and copying them onto lower-triang elts:
         gram_mats_sym[i] = np.tril(gram_mats_sym[i].T) + np.triu(gram_mats_sym[i], 1)
     return gram_mats_sym
-
-
-@nb.njit
-def get_rational_approximation_one_0_to_1(x, max_denom):
-    """
-    :param x: float between 0 and 1
-    :param max_denom: max denominator of approximation
-    :return: numerator and denominator where denominator < max_denominator such that numerator / denominator is optimal
-    rational approximation of x
-    """
-    a, b = 0, 1
-    c, d = 1, 1
-    while b <= max_denom and d <= max_denom:
-        mediant = float(a + c) / (b + d)
-        if x == mediant:
-            if b + d <= max_denom:
-                return a + c, b + d
-            elif d > b:
-                return c, d
-            else:
-                return a, b
-        elif x > mediant:
-            a, b = a + c, b + d
-        else:
-            c, d = a + c, b + d
-    if b > max_denom:
-        return c, d
-    else:
-        return a, b
-
-
-@nb.njit
-def get_rational_approximation_one(x, max_denom):
-    """
-    :param x: float
-    :param max_denom: max denominator of approximation
-    :return: numerator and denominator where denominator < max_denominator such that numerator / denominator is optimal
-    rational approximation of x
-    """
-    x_floor = int(np.floor(x))
-    x_frac = x - x_floor
-    _num, _denom = get_rational_approximation_one_0_to_1(x_frac, max_denom)
-    return _num + _denom * x_floor, _denom
-
-
-def get_rational_approximation(mat, max_denom):
-    """
-    :param mat: matrix of floats
-    :param max_denom: positive integer
-    :return: np.ndarray of Fractions which are the best rational approximations to the entries of mat with denominator
-    bounded by max_denom.
-    """
-
-    array = np.array(mat)
-    rationals = np.zeros_like(mat, dtype=Fraction)
-    for (i, j), a in np.ndenumerate(array):
-        num, denom = get_rational_approximation_one(a, max_denom)
-        rationals[i, j] = Fraction(num, denom)
-    return rationals
-
-# TODO: this vectorised version doesn't work because of Numba errors, although it's more elegant than get_rational_approximation
-# from functools import partial
-#
-#
-# def get_rational_approximation(mat, max_denom):
-#     """
-#     :param mat: matrix of floats
-#     :param max_denom: positive integer
-#     :return: np.ndarray of Fractions which are the best rational approximations to the entries of mat with denominator
-#     bounded by max_denom.
-#     """
-#
-#     _rationals = map(partial(get_rational_approximation_one, max_denom=max_denom), mat)
-#     rationals = np.array([Fraction(_l[0], _l[1]) for _l in _rationals])
-#     return rationals
 
 
 @nb.njit
@@ -441,7 +267,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
         if solv_status == 'Optimal solution found':
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
-            psd_status, char_poly = check_PSD_rational(gram_mat_q)
+            psd_status, char_poly = check_psd_rational(gram_mat_q)
             if psd_status:
                 monom_vec = get_sqroot_monoms(poly)
                 if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -465,7 +291,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                     return msg, nan
 
                 gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom_rat_approx)
-                psd_status, char_poly = check_PSD_rational(gram_mat_q)
+                psd_status, char_poly = check_psd_rational(gram_mat_q)
                 if psd_status:
                     monom_vec = get_sqroot_monoms(poly)
                     if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -478,7 +304,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                 else:
                     # Try again with larger denominator.
                     gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=10 ** 9 * max_denom_rat_approx)
-                    psd_status, char_poly = check_PSD_rational(gram_mat_q)
+                    psd_status, char_poly = check_psd_rational(gram_mat_q)
                     if psd_status:
                         monom_vec = get_sqroot_monoms(poly)
                         if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -500,7 +326,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         # Unique Gram matrix. No need for SDP.
         # The max denominator below should be changed to twice the largest denominator appearing as a coeff in poly.
         gram_mat_q = get_rational_approximation(sym_mat_list_gram[0], max_denom_rat_approx)
-        psd_status, char_poly = check_PSD_rational(gram_mat_q)
+        psd_status, char_poly = check_psd_rational(gram_mat_q)
         if psd_status:
             monom_vec = get_sqroot_monoms(poly)
             if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -534,7 +360,7 @@ def form_sos(gram_mat_q, monom_vec):
     return sos
 
 
-def check_PSD_rational(sym_rat_mat):
+def check_psd_rational(sym_rat_mat):
     """
     :param sym_rat_mat: symmetric rational matrix
     :return: not wrong_sign, a boolean expression, True if sym_rat_mat is PSD, False if not, and char_poly,
@@ -615,34 +441,9 @@ def form_num_gram_mat(basis_matrices, sol_vec_numerical):
     return gram_mat
 
 
-def get_special_sos_multiplier(poly):
+def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS, eig_tol=-1e-07, epsilon=1e-07):
     """
     :param poly: sympy polynomial
-    :return: factorisation of poly
-    """
-    _symbols = [1] + list(poly.free_symbols)
-    _mult = np.sum([_s ** 2 for _s in _symbols]).as_poly()
-    return _mult
-
-
-def get_max_even_divisor(polynomial):
-    """
-    :param polynomial: sympy polynomial
-    :return: leading coefficient of poly, max polynomial divisor of poly that's even power, remainder of poly / max_divisor
-    """
-    _factors = factor_list(polynomial)
-    _coeff_leading = _factors[0]
-    _factors_non_constant = _factors[1]
-    _factors_max_even_divisor = [(_p, 2 * (n // 2)) for (_p, n) in _factors_non_constant]
-    _factors_remainder = [(_p, n - 2 * (n // 2)) for (_p, n) in _factors_non_constant]
-    _max_even_divisor = np.prod([_p.as_expr() ** n for (_p, n) in _factors_max_even_divisor])
-    _remainder = np.prod([_p.as_expr() ** n for (_p, n) in _factors_remainder])
-    return _coeff_leading, _max_even_divisor, _remainder
-
-
-def get_sos(polynomial, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS, eig_tol=-1e-07, epsilon=1e-07):
-    """
-    :param polynomial: sympy polynomial
     :param max_mult_power:
     :param dsdp_solver:
     :param dsdp_options:
@@ -651,16 +452,16 @@ def get_sos(polynomial, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_
     :return: string with status whether poly is a sum of squares of polynomials, and a sympy expression that is
     the SOSRF decomposition of the poly
     """
-    if polynomial == 0:
+    if poly == 0:
         _status = 'Zero polynomial.'
         return _status, nan
 
     # check polynomial is nonconstant
-    if np.all([_d == 0 for _d in degree_list(polynomial)]):
+    if np.all([_d == 0 for _d in degree_list(poly)]):
         _status = 'Constant polynomial.'
         return _status, nan
 
-    poly_indices = np.array(list(polynomial.as_poly().as_dict().keys()))
+    poly_indices = np.array(list(poly.as_poly().as_dict().keys()))
     monoms = get_pts_in_cvx_hull(poly_indices)
     num_alpha = monoms.shape[0]
 
@@ -668,12 +469,12 @@ def get_sos(polynomial, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_
         _status = 'Error in computing monomial indices.'
         return _status, nan
 
-    degree = polynomial.as_poly().degree()
+    degree = poly.as_poly().degree()
     if degree % 2:
         _status = 'Polynomial has odd degree. Not a sum of squares.'
         return _status, nan
 
-    coeff_leading, max_even_divisor, remainder = get_max_even_divisor(polynomial)
+    coeff_leading, max_even_divisor, remainder = get_max_even_divisor(poly)
     if remainder == 1:
         _status = 'Exact SOS decomposition found.'
         sos = coeff_leading * max_even_divisor
@@ -690,3 +491,23 @@ def get_sos(polynomial, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_
             _status = 'No exact SOS decomposition found.'
             sos = nan
     return _status, sos
+
+
+def get_coeffs(poly):
+    """
+    :param poly: multivariable sympy poly
+    :return: vector of coefficients, including zeros for all multi-indices
+    in the convex hull of multi-indices appearing in poly.
+    Includes case where multi-indices in poly have less than full-dimensional
+    convex hull.
+    """
+
+    indices = np.array(list(poly.as_poly().as_dict().keys()))
+    mat = get_pts_in_cvx_hull(indices)
+    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
+    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
+    coeff_vec = np.zeros(num_nontriv_eq)
+    for i in range(num_nontriv_eq):
+        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
+            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
+    return coeff_vec
