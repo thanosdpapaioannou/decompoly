@@ -1,7 +1,8 @@
 from unittest import TestCase
 from sympy import poly, expand, nan, simplify
 from fractions import Fraction
-from decompoly import get_sos, get_rational_approximation_one_0_to_1, get_rational_approximation_one
+from src.opt import get_sos
+from src.util import get_rational_approximation_one_0_to_1, get_rational_approximation_one
 
 
 class TestGet_sos(TestCase):

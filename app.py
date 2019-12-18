@@ -1,7 +1,9 @@
 from flask import Flask, render_template, flash, request
 from wtforms import Form, StringField, validators
-from decompoly import get_sos
+from src.opt import get_sos
 from sympy import poly, latex, sympify, nan
+
+from src.poly import get_latex_from_poly
 
 DEBUG = True
 app = Flask(__name__)
@@ -13,15 +15,9 @@ class ReusableForm(Form):
     polynomial = StringField('Polynomial', validators=[validators.DataRequired()])
 
 
-def get_latex_from_poly(polynomial):
-    _latex_string = latex(polynomial, mode='plain')
-    _poly_str = _latex_string.split(',')[0].replace('\operatorname{Poly}{\left(', '').strip()
-    return _poly_str
-
-
 def is_input_polynomial(input):
     try:
-        _polynomial = poly(input)
+        _ = poly(input)
     except:
         return False
     return True
