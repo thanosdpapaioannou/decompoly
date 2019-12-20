@@ -76,18 +76,12 @@ def constr_eq_compat(poly_ind, sqroot_monoms):
     return compat
 
 
-@nb.njit
 def form_sdp_constraint_dense(matrix_list):
     """
     :param matrix_list: list of matrices
     :return: list of matrices of matrix_list each reformatted to the format required by solvers.sdp function.
     """
-
-    num_constr = len(matrix_list)
-    row_size = matrix_list[0].shape[0] ** 2
-    constr = np.zeros((num_constr, row_size))
-    for i in range(num_constr):
-        constr[i] = matrix_list[i].reshape((1, row_size))
+    constr = np.array([_a.flatten() for _a in matrix_list])
     return constr
 
 
