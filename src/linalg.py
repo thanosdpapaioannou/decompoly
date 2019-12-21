@@ -53,3 +53,12 @@ def form_constraint_eq_matrices(mat, mat_other):
         if point_count > 0:
             _mat.append(mat_i)
     return _mat
+
+
+def flatten(matrix_list):
+    """
+    :param matrix_list: list of matrices
+    :return: list of matrices of matrix_list each reformatted to the format required by solvers.sdp function.
+    """
+    constr = np.array([_a.flatten() for _a in matrix_list])
+    return constr

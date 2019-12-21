@@ -6,7 +6,7 @@ from scipy.linalg import null_space, orth, eigvalsh
 from fractions import Fraction
 import numba as nb
 
-from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices
+from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten
 from src.poly import get_special_sos_multiplier, get_max_even_divisor
 from src.util import get_rational_approximation, sym_coeff
 
@@ -74,15 +74,6 @@ def constr_eq_compat(poly_ind, sqroot_monoms):
         if count == 0:
             compat = False
     return compat
-
-
-def form_sdp_constraint_dense(matrix_list):
-    """
-    :param matrix_list: list of matrices
-    :return: list of matrices of matrix_list each reformatted to the format required by solvers.sdp function.
-    """
-    constr = np.array([_a.flatten() for _a in matrix_list])
-    return constr
 
 
 # jit doesn't support sparse matrices (spmatrix) used here
@@ -216,7 +207,7 @@ def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver
     optimizing the SDP problem if solver_status is 'optimal', and nan instead
     """
 
-    sym_grams = matrix(form_sdp_constraint_dense(basis_matrices[1:])).T
+    sym_grams = matrix(flatten(basis_matrices[1:])).T
     if objective == 'zero':
         obj_vec = matrix(np.zeros((len(basis_matrices) - 1, 1)))
     elif objective == 'min_trace':
