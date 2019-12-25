@@ -62,3 +62,17 @@ def flatten(matrix_list):
     """
     constr = np.array([_a.flatten() for _a in matrix_list])
     return constr
+
+
+@nb.njit
+def get_explicit_rep_objective(sym_matrix_list):
+    """
+    :param sym_matrix_list:
+    :return:
+    column objective vector d in the SDP written in explicit form,
+    so that the objective is to minimize d^T y.
+    The objective is chosen to correspond to the identity matrix in the implicit representation.
+    """
+
+    obj_vec = [np.trace(_m) for _m in sym_matrix_list]
+    return obj_vec[1:]

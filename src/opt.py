@@ -6,7 +6,7 @@ from scipy.linalg import null_space, orth, eigvalsh
 from fractions import Fraction
 import numba as nb
 
-from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten
+from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective
 from src.poly import get_special_sos_multiplier, get_max_even_divisor
 from src.util import get_rational_approximation, sym_coeff
 
@@ -139,22 +139,6 @@ def get_explicit_form_basis(monoms, sqroot_monoms, poly):
         # make gram_mats_sym[i] symmetric by accessing only upper-triang elts, and copying them onto lower-triang elts:
         gram_mats_sym[i] = np.tril(gram_mats_sym[i].T) + np.triu(gram_mats_sym[i], 1)
     return gram_mats_sym
-
-
-@nb.njit
-def get_explicit_rep_objective(sym_matrix_list):
-    """
-    :param sym_matrix_list:
-    :return:
-    column objective vector d in the SDP written in explicit form,
-    so that the objective is to minimize d^T y.
-    The objective is chosen to correspond to the identity matrix in the implicit representation.
-    """
-
-    obj_vec = np.zeros((len(sym_matrix_list) - 1, 1))
-    for i in range(1, len(sym_matrix_list)):
-        obj_vec[i - 1, 0] = np.trace(sym_matrix_list[i])
-    return obj_vec
 
 
 def get_sqroot_monoms(poly):
