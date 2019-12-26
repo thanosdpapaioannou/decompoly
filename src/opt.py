@@ -2,11 +2,12 @@ from sympy import expand, Matrix, nan, degree_list
 from cvxopt import matrix, solvers, spmatrix
 from scipy.spatial import ConvexHull
 import numpy as np
-from scipy.linalg import null_space, orth, eigvalsh
+from scipy.linalg import null_space, orth
 from fractions import Fraction
 import numba as nb
 
-from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective
+from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
+    is_symmetric_and_positive_definite
 from src.poly import get_special_sos_multiplier, get_max_even_divisor
 from src.util import get_rational_approximation, sym_coeff
 
@@ -236,31 +237,26 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
         if solv_status == 'Optimal solution found':
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
-            psd_status, char_poly = check_psd_rational(gram_mat_q)
-            if psd_status:
-                monom_vec = get_sqroot_monoms(poly)
-                if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
-                    sos = form_sos(gram_mat_q, monom_vec)
-                    msg = 'Exact SOS decomposition found.'
-                    return msg, sos
-                else:
-                    msg = 'Not an exact Gram matrix.'
-                    return msg, nan
+            monom_vec = get_sqroot_monoms(poly)
+            if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
+                sos = form_sos(gram_mat_q, monom_vec)
+                msg = 'Exact SOS decomposition found.'
+                return msg, sos
             else:
-                msg = 'Error. Solution not PSD'
+                msg = 'Not an exact Gram matrix.'
                 return msg, nan
 
         else:
             solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=eig_tol)
             if solv_status == 'Optimal solution found':
                 gram_mat = form_num_gram_mat(sym_mat_list_gram, sol_vec)
-                is_psd, eigs = check_psd_numerical(gram_mat, eig_tol=eig_tol)
-                if is_psd == 'not PSD':
+                psd_status = is_symmetric_and_positive_definite(gram_mat, eig_tol=eig_tol)
+                if not psd_status:
                     msg = 'No PSD Gram matrix found.'
                     return msg, nan
 
                 gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom_rat_approx)
-                psd_status, char_poly = check_psd_rational(gram_mat_q)
+                psd_status = is_symmetric_and_positive_definite(gram_mat_q)
                 if psd_status:
                     monom_vec = get_sqroot_monoms(poly)
                     if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -273,7 +269,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                 else:
                     # Try again with larger denominator.
                     gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=10 ** 9 * max_denom_rat_approx)
-                    psd_status, char_poly = check_psd_rational(gram_mat_q)
+                    psd_status = is_symmetric_and_positive_definite(gram_mat_q)
                     if psd_status:
                         monom_vec = get_sqroot_monoms(poly)
                         if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -295,7 +291,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         # Unique Gram matrix. No need for SDP.
         # The max denominator below should be changed to twice the largest denominator appearing as a coeff in poly.
         gram_mat_q = get_rational_approximation(sym_mat_list_gram[0], max_denom_rat_approx)
-        psd_status, char_poly = check_psd_rational(gram_mat_q)
+        psd_status = is_symmetric_and_positive_definite(np.vectorize(float)(gram_mat_q))
         if psd_status:
             monom_vec = get_sqroot_monoms(poly)
             if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
@@ -329,43 +325,12 @@ def form_sos(gram_mat_q, monom_vec):
     return sos
 
 
-def check_psd_rational(sym_rat_mat):
-    """
-    :param sym_rat_mat: symmetric rational matrix
-    :return: not wrong_sign, a boolean expression, True if sym_rat_mat is PSD, False if not, and char_poly,
-    a polynomial object, the characteristic polynomial of sym_rat_mat
-    """
-    char_poly = Matrix(sym_rat_mat).charpoly()
-    char_coeffs = char_poly.all_coeffs()
-    wrong_sign = False
-    for i, _c in enumerate(char_coeffs):
-        if (-1) ** i * _c < 0:
-            wrong_sign = True
-
-    return not wrong_sign, char_poly
-
-
-def check_psd_numerical(sym_mat, eig_tol=-10 ** (-7)):
-    """
-    :param sym_mat: symmetric matrix of floats
-    :param eig_tol: float, default -10**(-7)
-    :return: string message, either 'PSD' or 'not PSD' according to whether the smallest eigenvalue
-    computed by eigvalsh is greater than eig_tol
-    """
-    eigs = eigvalsh(sym_mat)
-    if eigs[0] < eig_tol:
-        status = 'not PSD'
-    else:
-        status = 'PSD'
-    return status, eigs
-
-
 def check_gram_exact(sym_rat_mat, monom_vec, poly):
     """
     :param sym_rat_mat: n*n symmetric matrix of rational numbers
     :param monom_vec: n*1 basis vector of monomials
     :param poly: polynomial
-    :return: string, either 'exact' or 'not exact' according to whether monom_vec^T sym_rat_mat monom_vec = poly
+    :return: string, either 'exact' or 'not exact' according to whether monom_vec^T sym_mat monom_vec = poly
     """
     # Check that v^T Q v = poly, where v is the monomial vector.
     check_poly = expand((Matrix(monom_vec).transpose() * Matrix(sym_rat_mat) * Matrix(monom_vec))[0, 0])

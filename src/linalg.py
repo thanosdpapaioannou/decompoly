@@ -1,5 +1,7 @@
 import numba as nb
 import numpy as np
+from scipy.linalg import eigvalsh
+from sympy import Matrix
 
 from src.util import np_amax, np_amin
 
@@ -76,3 +78,17 @@ def get_explicit_rep_objective(sym_matrix_list):
 
     obj_vec = [np.trace(_m) for _m in sym_matrix_list]
     return obj_vec[1:]
+
+
+def is_symmetric_and_positive_definite(sym_mat):
+    if np.allclose(sym_mat, sym_mat.T):
+        try:
+            np.linalg.cholesky(sym_mat)
+            return True
+        except np.linalg.LinAlgError as err:
+            if 'Matrix is not positive definite' in str(err):
+                return False
+            else:
+                raise
+    else:
+        return False
