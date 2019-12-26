@@ -3,9 +3,23 @@ from sympy import poly, expand, nan, simplify
 from fractions import Fraction
 from src.opt import get_sos
 from src.util import get_rational_approximation_one_0_to_1, get_rational_approximation_one
+from src.linalg import is_symmetric_and_positive_definite
+import numpy as np
 
 
 class TestGet_sos(TestCase):
+
+    def test_is_symmetric_and_positive_definite_0(self):
+        sym_mat = np.array([[1, 0], [0, 1]])
+        self.assertEqual(is_symmetric_and_positive_definite(sym_mat), True)
+
+    def test_is_symmetric_and_positive_definite_1(self):
+        sym_mat = np.array([[5, 3, 9], [4, 5, 7], [9, 7, 5]])
+        self.assertEqual(is_symmetric_and_positive_definite(sym_mat), False)
+
+    def test_is_symmetric_and_positive_definite_2(self):
+        sym_mat = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        self.assertEqual(is_symmetric_and_positive_definite(sym_mat), True)
 
     def test_get_rational_approximation_one_0_to_1_0(self):
         a = 0.5
