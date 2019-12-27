@@ -7,7 +7,7 @@ from fractions import Fraction
 import numba as nb
 
 from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
-    is_symmetric_and_positive_definite
+    is_symmetric_and_positive_definite, form_sos
 from src.poly import get_special_sos_multiplier, get_max_even_divisor
 from src.util import get_rational_approximation, sym_coeff
 
@@ -158,28 +158,6 @@ def get_sqroot_monoms(poly):
     return monom_vec
 
 
-def lu_to_sq_factors(lt, ut, perm, monom_vec):
-    """
-    :param lt: L in the LU decomposition of a rational PSD Gram matrix
-    :param ut: U in the LU decomposition of a rational PSD Gram matrix
-    :param perm: list of transpositions returned by LU decomposition
-    :param monom_vec: vector of monomials in 1/2*ConvexHull(poly)
-    :return: two lists corresponding to the SOS decomposition of poly,
-    a list of positive factors, and a list of the polynomial factors to be squared.
-    """
-
-    perm_mat = Matrix.eye(lt.shape[0]).permuteFwd(perm)
-    perm_vec = perm_mat * monom_vec
-    pos_coeffs = []
-    for i in range(ut.shape[0]):
-        pos_coeffs.append((ut * perm_mat.transpose())[i, i])
-
-    sq_factors = []
-    for i in range(lt.shape[0]):
-        sq_factors.append(lt[:, i].transpose().dot(perm_vec))
-    return pos_coeffs, sq_factors
-
-
 def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS):
     """
     :param basis_matrices: list of symmetric matrices G_0, G_1, ..., G_n of same size
@@ -238,6 +216,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         if solv_status == 'Optimal solution found':
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
             monom_vec = get_sqroot_monoms(poly)
+            # breakpoint()
             if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
                 sos = form_sos(gram_mat_q, monom_vec)
                 msg = 'Exact SOS decomposition found.'
@@ -304,25 +283,6 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         else:
             msg = 'Unique Gram matrix not PSD. Not a sum of squares.'
             return msg, nan
-
-
-def form_sos(gram_mat_q, monom_vec):
-    """
-    :param gram_mat_q: a rational symmetric PSD matrix
-    :param monom_vec: basis vector of monomials corresponding to gram_mat_q
-    :return: sos, an expression consisting of a sum-of-squares decomposition of the polynomial
-    with Gram matrix gram_mat_q
-    """
-    lt, ut, perm = Matrix(gram_mat_q).LUdecomposition()
-    # print(Matrix(gram_mat_q).LUdecomposition())
-
-    coeffs, factors = lu_to_sq_factors(lt, ut, perm, monom_vec)
-    # print(coeffs)
-    # print(factors)
-    # sos = np.sum([_c * factors[i] ** 2 for i, _c in enumerate(coeffs)]).as_poly()
-    sos = np.sum([_c * factors[i] ** 2 for i, _c in enumerate(coeffs)]).as_expr()
-    # msg = 'Exact SOS decomposition found.'
-    return sos
 
 
 def check_gram_exact(sym_rat_mat, monom_vec, poly):

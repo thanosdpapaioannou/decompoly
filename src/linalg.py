@@ -1,6 +1,5 @@
 import numba as nb
 import numpy as np
-from scipy.linalg import eigvalsh
 from sympy import Matrix
 
 from src.util import np_amax, np_amin
@@ -92,3 +91,22 @@ def is_symmetric_and_positive_definite(sym_mat):
                 raise
     else:
         return False
+
+
+def form_sos(gram_mat_q, monom_vec):
+    """
+    :param gram_mat_q: a rational symmetric PSD matrix
+    :param monom_vec: basis vector of monomials corresponding to gram_mat_q in 1/2*ConvexHull(poly)
+    :return: sos, an expression consisting of a sum-of-squares decomposition of the polynomial
+    with Gram matrix gram_mat_q
+    """
+    L, U, p = Matrix(gram_mat_q).LUdecomposition()
+    perm_mat = Matrix.eye(L.shape[0]).permuteFwd(p)
+    perm_vec = perm_mat * monom_vec
+
+    coeffs = np.array((U * perm_mat.transpose())).diagonal()
+    n = len(monom_vec)
+    factors = [L[:, i].transpose().dot(perm_vec) for i in range(n)]
+    sos = np.dot(coeffs, [f ** 2 for f in factors]).as_expr()
+    return sos
+
