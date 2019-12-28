@@ -1,14 +1,14 @@
-from sympy import expand, Matrix, nan, degree_list
+from sympy import Matrix, nan, degree_list
 from cvxopt import matrix, solvers, spmatrix
 from scipy.spatial import ConvexHull
 import numpy as np
 from scipy.linalg import null_space, orth
-from fractions import Fraction
 import numba as nb
 
 from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
     is_symmetric_and_positive_definite, form_sos
-from src.poly import get_special_sos_multiplier, get_max_even_divisor
+from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
+    form_num_gram_mat
 from src.util import get_rational_approximation, sym_coeff
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
@@ -104,6 +104,26 @@ def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
         if count_nontriv:
             constraints.append(spmatrix(1, constraint_i_rows, constraint_i_cols, (num, num)))
     return constraints
+
+
+def get_coeffs(poly):
+    """
+    :param poly: multivariable sympy poly
+    :return: vector of coefficients, including zeros for all multi-indices
+    in the convex hull of multi-indices appearing in poly.
+    Includes case where multi-indices in poly have less than full-dimensional
+    convex hull.
+    """
+
+    indices = np.array(list(poly.as_poly().as_dict().keys()))
+    mat = get_pts_in_cvx_hull(indices)
+    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
+    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
+    coeff_vec = np.zeros(num_nontriv_eq)
+    for i in range(num_nontriv_eq):
+        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
+            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
+    return coeff_vec
 
 
 def get_explicit_form_basis(monoms, sqroot_monoms, poly):
@@ -217,7 +237,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
             monom_vec = get_sqroot_monoms(poly)
             # breakpoint()
-            if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
+            # if get_basis_repr(gram_mat_q, monom_vec, poly):
+            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
                 sos = form_sos(gram_mat_q, monom_vec)
                 msg = 'Exact SOS decomposition found.'
                 return msg, sos
@@ -238,7 +259,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                 psd_status = is_symmetric_and_positive_definite(gram_mat_q)
                 if psd_status:
                     monom_vec = get_sqroot_monoms(poly)
-                    if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
+                    # if get_basis_repr(gram_mat_q, monom_vec, poly):
+                    if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
                         sos = form_sos(gram_mat_q, monom_vec)
                         msg = 'Exact SOS decomposition found.'
                         return msg, sos
@@ -251,7 +273,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                     psd_status = is_symmetric_and_positive_definite(gram_mat_q)
                     if psd_status:
                         monom_vec = get_sqroot_monoms(poly)
-                        if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
+                        # if get_basis_repr(gram_mat_q, monom_vec, poly):
+                        if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
                             sos = form_sos(gram_mat_q, monom_vec)
                             msg = 'Exact SOS decomposition found.'
                             return msg, sos
@@ -273,7 +296,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         psd_status = is_symmetric_and_positive_definite(np.vectorize(float)(gram_mat_q))
         if psd_status:
             monom_vec = get_sqroot_monoms(poly)
-            if check_gram_exact(gram_mat_q, monom_vec, poly) == 'exact':
+            # if get_basis_repr(gram_mat_q, monom_vec, poly):
+            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
                 sos = form_sos(gram_mat_q, monom_vec)
                 msg = 'Exact SOS decomposition found.'
                 return msg, sos
@@ -283,56 +307,6 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         else:
             msg = 'Unique Gram matrix not PSD. Not a sum of squares.'
             return msg, nan
-
-
-def check_gram_exact(sym_rat_mat, monom_vec, poly):
-    """
-    :param sym_rat_mat: n*n symmetric matrix of rational numbers
-    :param monom_vec: n*1 basis vector of monomials
-    :param poly: polynomial
-    :return: string, either 'exact' or 'not exact' according to whether monom_vec^T sym_mat monom_vec = poly
-    """
-    # Check that v^T Q v = poly, where v is the monomial vector.
-    check_poly = expand((Matrix(monom_vec).transpose() * Matrix(sym_rat_mat) * Matrix(monom_vec))[0, 0])
-    # print(check_poly)
-    if check_poly.as_poly() == poly.as_poly():
-        status = 'exact'
-    else:
-        status = 'not exact'
-
-    return status
-
-
-def form_rat_gram_mat(basis_matrices, sol_vec_numerical, max_denom):
-    """
-    :param basis_matrices: list of k+1 n*n symmetric matrices
-    :param sol_vec_numerical: k*1 vector
-    :param max_denom: positive integer
-    :return: finds best rational approximation rat_approx to sol_vec_numerical for which each entry has denominator
-    bounded by max_denom, and returns symmetric matrix of rationals basis_matrices[0] + basis_matrices[1]*rat_approx[1]+...
-    + basis_matrices[k]*rat_approx[k]
-    """
-    rat_approx = get_rational_approximation(sol_vec_numerical, max_denom)
-    gram_mat_q = np.zeros_like(basis_matrices[0], dtype=Fraction)
-    for i in range(len(basis_matrices) - 1):
-        gram_mat_q += get_rational_approximation(basis_matrices[i + 1], 10) * rat_approx[i]
-    gram_mat_q += get_rational_approximation(basis_matrices[0], 10)
-
-    return gram_mat_q
-
-
-def form_num_gram_mat(basis_matrices, sol_vec_numerical):
-    """
-    :param basis_matrices: list of k+1 n*n symmetric matrices
-    :param sol_vec_numerical: k*1 vector
-    :return: symmetric matrix  basis_matrices[0] + basis_matrices[1]*sol_vec_numerical[1]+...
-    + basis_matrices[k]*sol_vec_numerical[k]
-    """
-    gram_mat = basis_matrices[0]
-    for i in range(len(basis_matrices) - 1):
-        gram_mat += basis_matrices[i + 1] * sol_vec_numerical[i]
-
-    return gram_mat
 
 
 def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS, eig_tol=-1e-07, epsilon=1e-07):
@@ -385,23 +359,3 @@ def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTION
             _status = 'No exact SOS decomposition found.'
             sos = nan
     return _status, sos
-
-
-def get_coeffs(poly):
-    """
-    :param poly: multivariable sympy poly
-    :return: vector of coefficients, including zeros for all multi-indices
-    in the convex hull of multi-indices appearing in poly.
-    Includes case where multi-indices in poly have less than full-dimensional
-    convex hull.
-    """
-
-    indices = np.array(list(poly.as_poly().as_dict().keys()))
-    mat = get_pts_in_cvx_hull(indices)
-    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
-    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
-    coeff_vec = np.zeros(num_nontriv_eq)
-    for i in range(num_nontriv_eq):
-        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
-            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
-    return coeff_vec

@@ -1,7 +1,6 @@
 import numba as nb
 import numpy as np
 from sympy import Matrix
-
 from src.util import np_amax, np_amin
 
 
