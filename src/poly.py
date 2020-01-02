@@ -1,5 +1,5 @@
 import numpy as np
-from sympy import factor_list, latex, expand, Matrix
+from sympy import factor_list, latex, expand, Matrix, poly
 
 from src.util import get_rational_approximation
 
@@ -72,3 +72,11 @@ def form_rat_gram_mat(basis_matrices, sol_vec, max_denom):
     rat_basis_matrices = [get_rational_approximation(b, max_denom) for b in basis_matrices]
     gram_mat_q = form_num_gram_mat(rat_basis_matrices, rat_sol_vec)
     return gram_mat_q
+
+
+def is_polynomial(input):
+    try:
+        _ = poly(input)
+    except:
+        return False
+    return True

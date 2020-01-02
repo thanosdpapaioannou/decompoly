@@ -2,8 +2,7 @@ from flask import Flask, render_template, flash, request
 from wtforms import Form, StringField, validators
 from src.opt import get_sos
 from sympy import poly, latex, sympify, nan
-
-from src.poly import get_latex_from_poly
+from src.poly import get_latex_from_poly, is_polynomial
 
 DEBUG = True
 app = Flask(__name__)
@@ -15,20 +14,12 @@ class ReusableForm(Form):
     polynomial = StringField('Polynomial', validators=[validators.DataRequired()])
 
 
-def is_input_polynomial(input):
-    try:
-        _ = poly(input)
-    except:
-        return False
-    return True
-
-
 @app.route('/', methods=['GET', 'POST'])
 def hello():
     form = ReusableForm(request.form)
     if request.method == 'POST':
         _input = request.form['polynomial']
-        if form.validate() and is_input_polynomial(_input):
+        if form.validate() and is_polynomial(_input):
             _polynomial = poly(_input)
             msg, sos = get_sos(_polynomial)
             if sos == nan:

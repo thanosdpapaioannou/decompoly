@@ -1,5 +1,7 @@
 import numba as nb
 import numpy as np
+from scipy.linalg import null_space, orth
+from scipy.spatial.qhull import ConvexHull
 from sympy import Matrix
 from src.util import np_amax, np_amin
 
@@ -109,3 +111,34 @@ def form_sos(gram_mat_q, monom_vec):
     sos = np.dot(coeffs, [f ** 2 for f in factors]).as_expr()
     return sos
 
+
+def get_pts_in_cvx_hull(mat, tolerance=1e-03):
+    """
+    :param mat: matrix whose rows are integer lattice points,
+    :param tolerance:
+    :return: matrix whose rows are the integer lattice points lying within the convex hull
+    of these points to within a given tolerance. This includes the case in which the convex
+    hull is less than full dimension.
+    """
+
+    m = mat.shape[0]
+    mat_0 = mat - np.repeat([mat[0]], m, axis=0)  # Translating so that span goes through origin.
+    _null_space = null_space(mat_0)
+    _integer_pts = get_lattice_pts_in_prism(mat)
+    if _null_space.shape[1]:
+        _dot_prod = np.abs(
+            _integer_pts.dot(_null_space) - np.repeat([mat.dot(_null_space)[0]], _integer_pts.shape[0],
+                                                      axis=0))  # Calculate dot product with null vectors
+        include = np.all(np.less(_dot_prod, tolerance), axis=1)  # Include only points in same subspace up to tolerance
+        _integer_pts = _integer_pts[list(include)]
+
+    _orth = orth(mat_0.T)
+    if _orth.shape[1] > 1:
+        _cvx_hull = ConvexHull(mat.dot(_orth))
+
+        # Now check the points of _integer_pts against the inequalities that define the convex hull
+        __cvx_hull = (_cvx_hull.equations[:, :-1].dot(_orth.T.dot(_integer_pts.T))
+                      + _cvx_hull.equations[:, -1].reshape((_cvx_hull.equations.shape[0], 1)))
+        include = np.all(np.less(__cvx_hull, tolerance), axis=0)
+        _integer_pts = _integer_pts[list(include)]
+    return _integer_pts

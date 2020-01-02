@@ -1,58 +1,16 @@
 from sympy import Matrix, nan, degree_list
 from cvxopt import matrix, solvers, spmatrix
-from scipy.spatial import ConvexHull
 import numpy as np
-from scipy.linalg import null_space, orth
 import numba as nb
 
-from src.linalg import get_lattice_pts_in_prism, form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
-    is_symmetric_and_positive_definite, form_sos
+from src.linalg import form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
+    is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull
 from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
     form_num_gram_mat
 from src.util import get_rational_approximation, sym_coeff
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
-
-
-def get_pts_in_cvx_hull(mat, tolerance=1e-03):
-    """
-    :param mat: matrix whose rows are integer lattice points,
-    :param tolerance:
-    :return: matrix whose rows are the integer lattice points lying within the convex hull
-    of these points to within a given tolerance. This includes the case in which the convex
-    hull is less than full dimension.
-    """
-
-    nmons = mat.shape[0]
-    a_0 = mat - np.repeat([mat[0]], nmons, axis=0)  # Translating so that span goes through origin.
-    _null_space = null_space(a_0)
-    _integer_pts = get_lattice_pts_in_prism(mat)
-    if _null_space.shape[1] == 0:  # In this case, the convex hull has full dimension.
-        __integer_pts = _integer_pts
-    else:
-        _dot_prod = np.abs(
-            _integer_pts.dot(_null_space) - np.repeat([mat.dot(_null_space)[0]], _integer_pts.shape[0],
-                                                      axis=0))  # Calculate dot product with null vectors
-        include = np.all(np.less(_dot_prod, tolerance), axis=1)  # Include only points in same subspace up to tolerance
-        __integer_pts = _integer_pts[list(include)]
-
-    _orth = orth(a_0.T)
-    if _orth.shape[1] > 1:
-        _cvx_hull = ConvexHull(mat.dot(_orth))
-
-        # Now check the points of __integer_pts against the inequalities that define the convex hull
-        __cvx_hull = (_cvx_hull.equations[:, :-1].dot(_orth.T.dot(__integer_pts.T))
-                      + _cvx_hull.equations[:, -1].reshape((_cvx_hull.equations.shape[0], 1)))
-        include = np.all(np.less(__cvx_hull, tolerance), axis=0)
-        ___integer_pts = __integer_pts[list(include)]
-    else:
-        """
-        If the linear span of the points of mat is 1- or 0-dimensional, then there is no need to use inequalities given
-        the construction of the get_lattice_pts_in_prism function.
-        """
-        ___integer_pts = __integer_pts
-    return ___integer_pts
 
 
 @nb.njit
