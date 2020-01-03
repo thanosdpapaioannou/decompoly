@@ -1,43 +1,15 @@
 from sympy import Matrix, nan, degree_list
-from cvxopt import matrix, solvers, spmatrix
+from cvxopt import matrix, solvers
 import numpy as np
 
 from src.linalg import flatten, get_explicit_rep_objective, \
-    is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull
+    is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull, form_coeffs_constraint_eq_sparse_upper
 from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
     form_num_gram_mat, get_coeffs
 from src.util import get_rational_approximation, sym_coeff
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
-
-
-def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
-    """
-    Forms the coefficients of the constraint equations given matrices monoms, sqroot_monoms
-    whose rows correspond to the multi-indices in the convex hull and 1/2 the convex hull
-    of the multi-indices of a polynomial.
-    Constraint matrices are returned in spmatrix form; only upper triangular elements given.
-    :param monoms:
-    :param sqroot_monoms:
-    :return:
-    """
-
-    num = sqroot_monoms.shape[0]
-    constraints = []
-    for i in range(monoms.shape[0]):
-        constraint_i_rows = []
-        constraint_i_cols = []
-        count_nontriv = 0
-        for j in range(num):
-            for k in range(j, num):
-                if np.all(monoms[i] == (sqroot_monoms[j] + sqroot_monoms[k])):
-                    constraint_i_rows.append(j)
-                    constraint_i_cols.append(k)
-                    count_nontriv += 1
-        if count_nontriv:
-            constraints.append(spmatrix(1, constraint_i_rows, constraint_i_cols, (num, num)))
-    return constraints
 
 
 def get_explicit_form_basis(monoms, sqroot_monoms, poly):

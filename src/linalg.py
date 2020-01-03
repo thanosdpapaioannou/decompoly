@@ -1,5 +1,6 @@
 import numba as nb
 import numpy as np
+from cvxopt.base import spmatrix
 from scipy.linalg import null_space, orth
 from scipy.spatial.qhull import ConvexHull
 from sympy import Matrix
@@ -142,3 +143,32 @@ def get_pts_in_cvx_hull(mat, tolerance=1e-03):
         include = np.all(np.less(__cvx_hull, tolerance), axis=0)
         _integer_pts = _integer_pts[list(include)]
     return _integer_pts
+
+
+def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
+    """
+    Forms the coefficients of the constraint equations given matrices monoms, sqroot_monoms
+    whose rows correspond to the multi-indices in the convex hull and 1/2 the convex hull
+    of the multi-indices of a polynomial.
+    Constraint matrices are returned in spmatrix form; only upper triangular elements given.
+    :param monoms:
+    :param sqroot_monoms:
+    :return:
+    """
+
+    # breakpoint()
+    num = sqroot_monoms.shape[0]
+    constraints = []
+    for i in range(monoms.shape[0]):
+        constraint_i_rows = []
+        constraint_i_cols = []
+        count_nontriv = 0
+        for j in range(num):
+            for k in range(j, num):
+                if np.all(monoms[i] == (sqroot_monoms[j] + sqroot_monoms[k])):
+                    constraint_i_rows.append(j)
+                    constraint_i_cols.append(k)
+                    count_nontriv += 1
+        if count_nontriv:
+            constraints.append(spmatrix(1, constraint_i_rows, constraint_i_cols, (num, num)))
+    return constraints

@@ -92,12 +92,10 @@ def get_coeffs(poly):
     convex hull.
     """
 
-    indices = np.array(list(poly.as_poly().as_dict().keys()))
+    _dict = poly.as_poly().as_dict()
+    indices = np.array(list(_dict.keys()))
     mat = get_pts_in_cvx_hull(indices)
     mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
     num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
-    coeff_vec = np.zeros(num_nontriv_eq)
-    for i in range(num_nontriv_eq):
-        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
-            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
+    coeff_vec = np.array([_dict.get(tuple(mat[i]), 0) for i in range(num_nontriv_eq)])
     return coeff_vec
