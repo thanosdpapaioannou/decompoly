@@ -1,41 +1,17 @@
 from sympy import Matrix, nan, degree_list
 from cvxopt import matrix, solvers, spmatrix
 import numpy as np
-import numba as nb
 
-from src.linalg import form_constraint_eq_matrices, flatten, get_explicit_rep_objective, \
+from src.linalg import flatten, get_explicit_rep_objective, \
     is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull
 from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
-    form_num_gram_mat
+    form_num_gram_mat, get_coeffs
 from src.util import get_rational_approximation, sym_coeff
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
 
 
-@nb.njit
-def constr_eq_compat(poly_ind, sqroot_monoms):
-    """
-    :param poly_ind:
-    :param sqroot_monoms:
-    :return: Boolean value on whether the constraint equations admit a solution.
-    The constraint equations are unsatisfiable only if there is a monomial term
-    appearing in the polynomial that is not the sum of two points in sqroot_monoms.
-    """
-
-    compat = True
-    for i in range(poly_ind.shape[0]):
-        count = 0
-        for j in range(sqroot_monoms.shape[0]):
-            for k in range(j, sqroot_monoms.shape[0]):
-                if np.all(poly_ind[i] == sqroot_monoms[j] + sqroot_monoms[k]):
-                    count += 1
-        if count == 0:
-            compat = False
-    return compat
-
-
-# jit doesn't support sparse matrices (spmatrix) used here
 def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
     """
     Forms the coefficients of the constraint equations given matrices monoms, sqroot_monoms
@@ -62,26 +38,6 @@ def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
         if count_nontriv:
             constraints.append(spmatrix(1, constraint_i_rows, constraint_i_cols, (num, num)))
     return constraints
-
-
-def get_coeffs(poly):
-    """
-    :param poly: multivariable sympy poly
-    :return: vector of coefficients, including zeros for all multi-indices
-    in the convex hull of multi-indices appearing in poly.
-    Includes case where multi-indices in poly have less than full-dimensional
-    convex hull.
-    """
-
-    indices = np.array(list(poly.as_poly().as_dict().keys()))
-    mat = get_pts_in_cvx_hull(indices)
-    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
-    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
-    coeff_vec = np.zeros(num_nontriv_eq)
-    for i in range(num_nontriv_eq):
-        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
-            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
-    return coeff_vec
 
 
 def get_explicit_form_basis(monoms, sqroot_monoms, poly):

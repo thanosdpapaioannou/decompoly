@@ -1,6 +1,7 @@
 import numpy as np
 from sympy import factor_list, latex, expand, Matrix, poly
 
+from src.linalg import get_pts_in_cvx_hull, form_constraint_eq_matrices
 from src.util import get_rational_approximation
 
 
@@ -80,3 +81,23 @@ def is_polynomial(input):
     except:
         return False
     return True
+
+
+def get_coeffs(poly):
+    """
+    :param poly: multivariable sympy poly
+    :return: vector of coefficients, including zeros for all multi-indices
+    in the convex hull of multi-indices appearing in poly.
+    Includes case where multi-indices in poly have less than full-dimensional
+    convex hull.
+    """
+
+    indices = np.array(list(poly.as_poly().as_dict().keys()))
+    mat = get_pts_in_cvx_hull(indices)
+    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
+    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
+    coeff_vec = np.zeros(num_nontriv_eq)
+    for i in range(num_nontriv_eq):
+        if tuple(mat[i]) in poly.as_poly().as_dict().keys():
+            coeff_vec[i] = poly.as_poly().as_dict()[tuple(mat[i])]
+    return coeff_vec
