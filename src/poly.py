@@ -11,7 +11,7 @@ def get_special_sos_multiplier(poly):
     :return: factorisation of poly
     """
     _symbols = [1] + list(poly.free_symbols)
-    _mult = np.sum([_s ** 2 for _s in _symbols]).as_poly()
+    _mult = np.sum([_s ** 2 for _s in _symbols])
     return _mult
 
 
@@ -92,10 +92,30 @@ def get_coeffs(poly):
     convex hull.
     """
 
-    _dict = poly.as_poly().as_dict()
+    _dict = poly.as_dict()
     indices = np.array(list(_dict.keys()))
+    sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * indices)
+
     mat = get_pts_in_cvx_hull(indices)
-    mat_other = get_pts_in_cvx_hull(1 / 2 * indices)
-    num_nontriv_eq = len(form_constraint_eq_matrices(mat, mat_other))
+    num_nontriv_eq = len(form_constraint_eq_matrices(mat, sqroot_monoms))
     coeff_vec = np.array([_dict.get(tuple(mat[i]), 0) for i in range(num_nontriv_eq)])
     return coeff_vec
+
+
+def get_sqroot_monoms(poly):
+    """
+    :param poly:
+    :return: column vector of monomials, the basis of the space of polynomials
+    whose square is in the convex hull of the monomials of poly.
+    """
+
+    _dict = poly.as_dict()
+    indices = np.array(list(_dict.keys()))
+    sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * indices)
+
+    m, n = sqroot_monoms.shape
+    monom_vec = Matrix.ones(m, 1)
+    for i in range(m):
+        for j in range(n):
+            monom_vec[i, 0] *= poly.gens[j] ** sqroot_monoms[i, j]
+    return monom_vec

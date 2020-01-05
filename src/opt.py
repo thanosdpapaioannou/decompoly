@@ -1,11 +1,11 @@
-from sympy import Matrix, nan, degree_list
+from sympy import nan, degree_list
 from cvxopt import matrix, solvers
 import numpy as np
 
 from src.linalg import flatten, get_explicit_rep_objective, \
     is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull, form_coeffs_constraint_eq_sparse_upper
 from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
-    form_num_gram_mat, get_coeffs
+    form_num_gram_mat, get_coeffs, get_sqroot_monoms
 from src.util import get_rational_approximation, sym_coeff
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
@@ -46,22 +46,6 @@ def get_explicit_form_basis(monoms, sqroot_monoms, poly):
         # make gram_mats_sym[i] symmetric by accessing only upper-triang elts, and copying them onto lower-triang elts:
         gram_mats_sym[i] = np.tril(gram_mats_sym[i].T) + np.triu(gram_mats_sym[i], 1)
     return gram_mats_sym
-
-
-def get_sqroot_monoms(poly):
-    """
-    :param poly:
-    :return: column vector of monomials, the basis of the space of polynomials
-    whose square is in the convex hull of the monomials of poly.
-    """
-
-    poly_indices = np.array(poly.as_poly().monoms())
-    sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * poly_indices)
-    monom_vec = Matrix.ones(sqroot_monoms.shape[0], 1)
-    for i in range(sqroot_monoms.shape[0]):
-        for j in range(sqroot_monoms.shape[1]):
-            monom_vec[i, 0] *= poly.as_poly().gens[j] ** sqroot_monoms[i, j]
-    return monom_vec
 
 
 def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS):
@@ -112,7 +96,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
     the SOSRF decomposition of the poly
     """
 
-    poly_indices = np.array(list(poly.as_poly().as_dict().keys()))
+    poly_indices = np.array(list(poly.as_dict().keys()))
     monoms = get_pts_in_cvx_hull(poly_indices)
     sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * poly_indices)
     # num_beta = sqroot_monoms.shape[0]
@@ -122,9 +106,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         if solv_status == 'Optimal solution found':
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
             monom_vec = get_sqroot_monoms(poly)
-            # breakpoint()
-            # if get_basis_repr(gram_mat_q, monom_vec, poly):
-            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
+            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
                 sos = form_sos(gram_mat_q, monom_vec)
                 msg = 'Exact SOS decomposition found.'
                 return msg, sos
@@ -145,8 +127,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                 psd_status = is_symmetric_and_positive_definite(gram_mat_q)
                 if psd_status:
                     monom_vec = get_sqroot_monoms(poly)
-                    # if get_basis_repr(gram_mat_q, monom_vec, poly):
-                    if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
+                    if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
                         sos = form_sos(gram_mat_q, monom_vec)
                         msg = 'Exact SOS decomposition found.'
                         return msg, sos
@@ -160,7 +141,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                     if psd_status:
                         monom_vec = get_sqroot_monoms(poly)
                         # if get_basis_repr(gram_mat_q, monom_vec, poly):
-                        if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
+                        if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
                             sos = form_sos(gram_mat_q, monom_vec)
                             msg = 'Exact SOS decomposition found.'
                             return msg, sos
@@ -183,7 +164,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
         if psd_status:
             monom_vec = get_sqroot_monoms(poly)
             # if get_basis_repr(gram_mat_q, monom_vec, poly):
-            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly.as_poly():
+            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
                 sos = form_sos(gram_mat_q, monom_vec)
                 msg = 'Exact SOS decomposition found.'
                 return msg, sos
@@ -215,7 +196,7 @@ def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTION
         _status = 'Constant polynomial.'
         return _status, nan
 
-    poly_indices = np.array(list(poly.as_poly().as_dict().keys()))
+    poly_indices = np.array(list(poly.as_dict().keys()))
     monoms = get_pts_in_cvx_hull(poly_indices)
     num_alpha = monoms.shape[0]
 
@@ -223,7 +204,7 @@ def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTION
         _status = 'Error in computing monomial indices.'
         return _status, nan
 
-    degree = poly.as_poly().degree()
+    degree = poly.degree()
     if degree % 2:
         _status = 'Polynomial has odd degree. Not a sum of squares.'
         return _status, nan
