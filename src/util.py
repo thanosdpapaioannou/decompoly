@@ -89,7 +89,8 @@ def get_rational_approximation(mat, max_denom):
 
 
 @nb.njit
-def sym_coeff(x, y):
+def sym_coeff(tuple):
+    x, y = tuple
     if x == y:
         return 1
     else:

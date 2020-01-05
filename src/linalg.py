@@ -4,7 +4,7 @@ from cvxopt.base import spmatrix
 from scipy.linalg import null_space, orth
 from scipy.spatial.qhull import ConvexHull
 from sympy import Matrix
-from src.util import np_amax, np_amin
+from src.util import np_amax, np_amin, sym_coeff
 
 
 @nb.njit
@@ -156,7 +156,6 @@ def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
     :return:
     """
 
-    # breakpoint()
     num = sqroot_monoms.shape[0]
     constraints = []
     for i in range(monoms.shape[0]):
@@ -172,3 +171,36 @@ def form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms):
         if count_nontriv:
             constraints.append(spmatrix(1, constraint_i_rows, constraint_i_cols, (num, num)))
     return constraints
+
+
+def get_explicit_form_basis(monoms, sqroot_monoms, coeffs):
+    """
+    :param monoms:
+    :param sqroot_monoms:
+    :param poly: sympy poly
+    :return: tuple of symmetric |sqroot_monoms|*|sqroot_monoms| matrices (G_0,G_1,...,G_n),
+    n = |sqroot_monoms|*(|sqroot_monoms|+1)/2 - (number of nontrivial constraints),
+    where G(y) = G_0 + G_1 y_1 + ... + G_n y_n, y in R^n
+    parametrizes the set of Gram matrices for the polynomial.
+    """
+
+    dim = sqroot_monoms.shape[0]
+    param = int(dim * (dim + 1) / 2)
+    constr = form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms)
+    gram_mats_sym = [np.zeros((dim, dim)) for _ in range(param - len(constr) + 1)]
+
+    num = 1
+    for i, _c in enumerate(constr):
+        count = len(_c.I)
+        _t = (_c.I[-1], _c.J[-1])
+        _st = sym_coeff(_t)
+        for j in range(count - 1):
+            _t_other = (_c.I[j], _c.J[j])
+            gram_mats_sym[num + j][_t_other] = 1
+            gram_mats_sym[num + j][_t] = -sym_coeff(_t_other) / _st
+        gram_mats_sym[0][_t] = coeffs[i] / _st
+        num += count - 1
+
+    # make each matrix in gram_mats_sym symmetric by accessing only upper-triang elts, and copying them onto lower-triang elts:
+    gram_mats_sym = [np.tril(g.T) + np.triu(g, 1) for g in gram_mats_sym]
+    return gram_mats_sym

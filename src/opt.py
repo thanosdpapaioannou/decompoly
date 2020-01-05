@@ -3,49 +3,13 @@ from cvxopt import matrix, solvers
 import numpy as np
 
 from src.linalg import flatten, get_explicit_rep_objective, \
-    is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull, form_coeffs_constraint_eq_sparse_upper
+    is_symmetric_and_positive_definite, form_sos, get_pts_in_cvx_hull, get_explicit_form_basis
 from src.poly import get_special_sos_multiplier, get_max_even_divisor, get_basis_repr, form_rat_gram_mat, \
     form_num_gram_mat, get_coeffs, get_sqroot_monoms
-from src.util import get_rational_approximation, sym_coeff
+from src.util import get_rational_approximation
 
 DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 'DSDP_GapTolerance': 1e-07,
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
-
-
-def get_explicit_form_basis(monoms, sqroot_monoms, poly):
-    """
-    :param monoms:
-    :param sqroot_monoms:
-    :param poly: sympy poly
-    :return: tuple of symmetric |sqroot_monoms|*|sqroot_monoms| matrices (G_0,G_1,...,G_n),
-    n = |sqroot_monoms|*(|sqroot_monoms|+1)/2 - (number of nontrivial constraints),
-    where G(y) = G_0 + G_1 y_1 + ... + G_n y_n, y in R^n
-    parametrizes the set of Gram matrices for the polynomial.
-    """
-
-    dim = sqroot_monoms.shape[0]
-    param = int(dim * (dim + 1) / 2)
-    constr = form_coeffs_constraint_eq_sparse_upper(monoms, sqroot_monoms)
-    gram_mats_sym = []
-    coeff = get_coeffs(poly)
-
-    for i in range(param - len(constr) + 1):
-        gram_mats_sym.append(np.zeros((dim, dim)))
-
-    num = 1
-    for i in range(len(constr)):
-        count = len(constr[i].I)
-        for j in range(count - 1):
-            gram_mats_sym[num + j][constr[i].I[j], constr[i].J[j]] = 1
-            gram_mats_sym[num + j][constr[i].I[-1], constr[i].J[-1]] = -sym_coeff(constr[i].I[j],
-                                                                                  constr[i].J[j]) / sym_coeff(
-                constr[i].I[-1], constr[i].J[-1])
-        gram_mats_sym[0][constr[i].I[-1], constr[i].J[-1]] = coeff[i] / sym_coeff(constr[i].I[-1], constr[i].J[-1])
-        num += count - 1
-    for i in range(len(gram_mats_sym)):
-        # make gram_mats_sym[i] symmetric by accessing only upper-triang elts, and copying them onto lower-triang elts:
-        gram_mats_sym[i] = np.tril(gram_mats_sym[i].T) + np.triu(gram_mats_sym[i], 1)
-    return gram_mats_sym
 
 
 def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS):
@@ -96,11 +60,11 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
     the SOSRF decomposition of the poly
     """
 
-    poly_indices = np.array(list(poly.as_dict().keys()))
-    monoms = get_pts_in_cvx_hull(poly_indices)
-    sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * poly_indices)
-    # num_beta = sqroot_monoms.shape[0]
-    sym_mat_list_gram = get_explicit_form_basis(monoms, sqroot_monoms, poly)
+    indices = np.array(list(poly.as_dict().keys()))
+    monoms = get_pts_in_cvx_hull(indices)
+    sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * indices)
+    coeffs = get_coeffs(poly)
+    sym_mat_list_gram = get_explicit_form_basis(monoms, sqroot_monoms, coeffs)
     if len(sym_mat_list_gram) > 1:
         solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
         if solv_status == 'Optimal solution found':
