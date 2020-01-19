@@ -67,7 +67,6 @@ def flatten(matrix_list):
     return constr
 
 
-@nb.njit
 def get_explicit_rep_objective(sym_matrix_list):
     """
     :param sym_matrix_list:

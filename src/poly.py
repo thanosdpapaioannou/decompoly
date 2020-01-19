@@ -51,8 +51,8 @@ def form_num_gram_mat(basis_matrices, sol_vec):
     """
     :param basis_matrices: list of k+1 n*n symmetric matrices
     :param sol_vec: k*1 vector
-    :return: symmetric matrix  basis_matrices[0] + basis_matrices[1]*sol_vec[1]+...
-    + basis_matrices[k]*sol_vec[k]
+    :return: symmetric matrix  sym_mat_list[0] + sym_mat_list[1]*sol_vec[1]+...
+    + sym_mat_list[k]*sol_vec[k]
     """
     gram_mat = basis_matrices[0]
     for i in range(len(basis_matrices) - 1):
@@ -66,8 +66,8 @@ def form_rat_gram_mat(basis_matrices, sol_vec, max_denom):
     :param sol_vec: k*1 vector
     :param max_denom: positive integer
     :return: finds best rational approximation rat_sol_vec to sol_vec for which each entry has denominator
-    bounded by max_denom, and returns symmetric matrix of rationals basis_matrices[0] + basis_matrices[1]*rat_sol_vec[1]+...
-    + basis_matrices[k]*rat_sol_vec[k]
+    bounded by max_denom, and returns symmetric matrix of rationals sym_mat_list[0] + sym_mat_list[1]*rat_sol_vec[1]+...
+    + sym_mat_list[k]*rat_sol_vec[k]
     """
     rat_sol_vec = get_rational_approximation(sol_vec, max_denom)
     rat_basis_matrices = [get_rational_approximation(b, max_denom) for b in basis_matrices]

@@ -12,11 +12,11 @@ DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
 
 
-def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS):
+def sdp_expl_solve(sym_mat_list, smallest_eig=0, objective='zero'):
     """
-    :param basis_matrices: list of symmetric matrices G_0, G_1, ..., G_n of same size
+    :param sym_mat_list: list of symmetric matrices G_0, G_1, ..., G_n of same size
     :param smallest eig: parameter (default 0) may be set to small positive quantity to force non-degeneracy
-    :param objective: string parameter, either 'zero', 'min_trace', or 'max_trace' (default 'zero'), determines
+    :param objective: string parameter, either 'zero', or 'max_trace' (default 'zero'), determines
     the objective in the SDP solver
     :param dsdp_solver: string, default 'dsdp' to specify which solver sdp.solver uses
     :param dsdp_options:
@@ -24,30 +24,23 @@ def sdp_expl_solve(basis_matrices, smallest_eig=0, objective='zero', dsdp_solver
     optimizing the SDP problem if solver_status is 'optimal', and nan instead
     """
 
-    sym_grams = matrix(flatten(basis_matrices[1:])).T
     if objective == 'zero':
-        obj_vec = matrix(np.zeros((len(basis_matrices) - 1, 1)))
-    elif objective == 'min_trace':
-        obj_vec = matrix(get_explicit_rep_objective(basis_matrices))
+        obj_vec = matrix(np.zeros((len(sym_mat_list) - 1, 1)))
+    elif objective == 'max_trace':
+        obj_vec = -matrix(get_explicit_rep_objective(sym_mat_list))
     else:
-        # Maximize trace in nondegenerate case
-        obj_vec = -matrix(get_explicit_rep_objective(basis_matrices))
+        raise ValueError(f'objective may only be max_trace or zero, but you entered {objective}')
 
-    sol = solvers.sdp(c=obj_vec, Gs=[-sym_grams],
-                      hs=[matrix(basis_matrices[0] - smallest_eig * np.eye(basis_matrices[0].shape[0]))],
-                      solver=dsdp_solver, options=dsdp_options)
-
-    if sol['status'] == 'optimal':
-        solver_status = 'Optimal solution found'
-        sol_vec = sol['x']
-    elif sol['status'] == 'primal infeasible' or sol['status'] == 'dual infeasible':
-        solver_status = 'infeasible'
-        sol_vec = nan
+    _hs = sym_mat_list[0] - smallest_eig * np.eye(sym_mat_list[0].shape[0])
+    sym_grams = matrix(flatten(sym_mat_list[1:])).T
+    sol = solvers.sdp(c=obj_vec, Gs=[-sym_grams], hs=[matrix(_hs)], solver='dsdp', options=DSDP_OPTIONS)
+    _status = sol['status']
+    if _status == 'optimal':
+        return 'Optimal solution found', sol['x']
+    elif 'infeasible' in _status:
+        return 'infeasible', nan
     else:
-        solver_status = 'unknown'
-        sol_vec = nan
-
-    return solver_status, sol_vec
+        return 'unknown', nan
 
 
 def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100):
@@ -140,7 +133,7 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
             return msg, nan
 
 
-def get_sos(poly, max_mult_power=3, dsdp_solver='dsdp', dsdp_options=DSDP_OPTIONS, eig_tol=-1e-07, epsilon=1e-07):
+def get_sos(poly, max_mult_power=3, eig_tol=-1e-07, epsilon=1e-07):
     """
     :param poly: sympy polynomial
     :param max_mult_power:
