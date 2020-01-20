@@ -59,8 +59,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
     coeffs = get_coeffs(poly)
     sym_mat_list_gram = get_explicit_form_basis(monoms, sqroot_monoms, coeffs)
     if len(sym_mat_list_gram) > 1:
-        solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
-        if solv_status == 'Optimal solution found':
+        sol_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
+        if sol_status == 'Optimal solution found':
             gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
             monom_vec = get_sqroot_monoms(poly)
             if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
@@ -72,8 +72,8 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
                 return msg, nan
 
         else:
-            solv_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=eig_tol)
-            if solv_status == 'Optimal solution found':
+            sol_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=eig_tol)
+            if sol_status == 'Optimal solution found':
                 gram_mat = form_num_gram_mat(sym_mat_list_gram, sol_vec)
                 psd_status = is_symmetric_and_positive_definite(gram_mat, eig_tol=eig_tol)
                 if not psd_status:
