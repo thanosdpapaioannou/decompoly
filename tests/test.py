@@ -137,11 +137,11 @@ class TestGet_sos(TestCase):
         self.assertEqual(status, 'Exact SOS decomposition found.')
         self.assertEqual(simplify(sos).as_expr(), polynomial.as_expr())
 
-    # def test_get_sos_motzkin_2(self):
-    #     polynomial = poly('x**4*y**2 + x**2*y**4 - 3*x**2*y**2*z**2 + z**6')
-    #     status, sos = get_sos(polynomial)
-    #     self.assertEqual(status, 'Exact SOS decomposition found.')
-    #     self.assertEqual(simplify(sos).as_expr(), polynomial.as_expr())
+    def test_get_sos_motzkin_2(self):
+        polynomial = poly('x**4*y**2 + x**2*y**4 - 3*x**2*y**2*z**2 + z**6')
+        status, sos = get_sos(polynomial)
+        self.assertEqual(status, 'Exact SOS decomposition found.')
+        self.assertEqual(simplify(sos).as_expr(), polynomial.as_expr())
 
     def test_get_sos_motzkin_with_denominator_multiplied_on_left(self):
         polynomial = poly('(1+x**2 + y**2)*(1 + x**2*y**2*(x**2 + y**2) - 3*x**2*y**2)')

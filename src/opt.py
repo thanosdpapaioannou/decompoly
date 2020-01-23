@@ -12,7 +12,7 @@ DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 
                 'abstol': 1e-07, 'reltol': 1e-06, 'feastol': 1e-07}
 
 
-def sdp_expl_solve(sym_mat_list, smallest_eig=0, objective='zero'):
+def sdp_expl_solve(sym_mat_list, smallest_eig=0.0, objective='zero'):
     """
     :param sym_mat_list: list of symmetric matrices G_0, G_1, ..., G_n of same size
     :param smallest eig: parameter (default 0) may be set to small positive quantity to force non-degeneracy
@@ -43,7 +43,7 @@ def sdp_expl_solve(sym_mat_list, smallest_eig=0, objective='zero'):
         return 'unknown', nan
 
 
-def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100):
+def get_sos_helper(poly, epsilon=0.001, max_denom_rat_approx=100):
     """
     :param poly: sympy polynomial
     :param eig_tol:
@@ -58,82 +58,28 @@ def get_sos_helper(poly, eig_tol=-1e-07, epsilon=1e-07, max_denom_rat_approx=100
     sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * indices)
     coeffs = get_coeffs(poly)
     sym_mat_list_gram = get_explicit_form_basis(monoms, sqroot_monoms, coeffs)
-    if len(sym_mat_list_gram) > 1:
-        sol_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon * 10 ** 4, objective='max_trace')
-        if sol_status == 'Optimal solution found':
-            gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=1000)
-            monom_vec = get_sqroot_monoms(poly)
-            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
-                sos = form_sos(gram_mat_q, monom_vec)
-                msg = 'Exact SOS decomposition found.'
-                return msg, sos
-            else:
-                msg = 'Not an exact Gram matrix.'
-                return msg, nan
-
-        else:
-            sol_status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=eig_tol)
-            if sol_status == 'Optimal solution found':
-                gram_mat = form_num_gram_mat(sym_mat_list_gram, sol_vec)
-                psd_status = is_symmetric_and_positive_definite(gram_mat, eig_tol=eig_tol)
-                if not psd_status:
-                    msg = 'No PSD Gram matrix found.'
-                    return msg, nan
-
-                gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom_rat_approx)
-                psd_status = is_symmetric_and_positive_definite(gram_mat_q)
-                if psd_status:
-                    monom_vec = get_sqroot_monoms(poly)
-                    if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
-                        sos = form_sos(gram_mat_q, monom_vec)
-                        msg = 'Exact SOS decomposition found.'
-                        return msg, sos
-                    else:
-                        msg = 'Not an exact Gram matrix.'
-                        return msg, nan
-                else:
-                    # Try again with larger denominator.
-                    gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=10 ** 9 * max_denom_rat_approx)
-                    psd_status = is_symmetric_and_positive_definite(gram_mat_q)
-                    if psd_status:
-                        monom_vec = get_sqroot_monoms(poly)
-                        # if get_basis_repr(gram_mat_q, monom_vec, poly):
-                        if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
-                            sos = form_sos(gram_mat_q, monom_vec)
-                            msg = 'Exact SOS decomposition found.'
-                            return msg, sos
-                        else:
-                            msg = 'Not an exact Gram matrix.'
-                            return msg, nan
-                    else:
-                        msg = 'Could not find exact PSD Gram matrix.'
-                        return msg, nan
-
-            else:
-                msg = 'SDP solver could not find solution.'
-                return msg, nan
-
-    else:
+    if len(sym_mat_list_gram) == 1:
         # Unique Gram matrix. No need for SDP.
-        # The max denominator below should be changed to twice the largest denominator appearing as a coeff in poly.
         gram_mat_q = get_rational_approximation(sym_mat_list_gram[0], max_denom_rat_approx)
         psd_status = is_symmetric_and_positive_definite(np.vectorize(float)(gram_mat_q))
-        if psd_status:
-            monom_vec = get_sqroot_monoms(poly)
-            # if get_basis_repr(gram_mat_q, monom_vec, poly):
-            if get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly:
-                sos = form_sos(gram_mat_q, monom_vec)
-                msg = 'Exact SOS decomposition found.'
-                return msg, sos
-            else:
-                msg = 'Not an exact Gram matrix.'
-                return msg, nan
+        if not psd_status:
+            status_ = 'Unique Gram matrix not PSD. Not a sum of squares.'
+            return status_, nan
+    else:
+        _status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon, objective='max_trace')
+        if _status == 'Optimal solution found':
+            gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom_rat_approx)
         else:
-            msg = 'Unique Gram matrix not PSD. Not a sum of squares.'
-            return msg, nan
+            status_ = 'Not an exact Gram matrix.'
+            return status_, nan
+    monom_vec = get_sqroot_monoms(poly)
+    assert get_basis_repr(gram_mat_q, monom_vec).as_poly() == poly
+    status_ = 'Exact SOS decomposition found.'
+    sos = form_sos(gram_mat_q, monom_vec)
+    return status_, sos
 
 
-def get_sos(poly, max_mult_power=3, eig_tol=-1e-07, epsilon=1e-07):
+def get_sos(poly, max_mult_power=3, epsilon=0.001):
     """
     :param poly: sympy polynomial
     :param max_mult_power:
@@ -174,9 +120,9 @@ def get_sos(poly, max_mult_power=3, eig_tol=-1e-07, epsilon=1e-07):
         _mult = get_special_sos_multiplier(remainder)
         for r in range(max_mult_power):
             print(f'Trying multiplier power: {r}')
-            status_, sos_ = get_sos_helper(poly=(_mult ** r * remainder).as_poly(), eig_tol=eig_tol, epsilon=epsilon)
+            status_, sos_ = get_sos_helper(poly=(_mult ** r * remainder).as_poly(), epsilon=epsilon)
             if status_ == 'Exact SOS decomposition found.':
-                _status = 'Exact SOS decomposition found.'
+                _status = status_
                 sos = (1 / _mult ** r) * coeff_leading * max_even_divisor * sos_.as_expr()
                 break
         else:
