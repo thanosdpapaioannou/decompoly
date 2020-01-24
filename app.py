@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, request
+from flask import Flask, render_template, flash, request, Markup
 from wtforms import Form, StringField, validators
 from src.opt import get_sos
 from sympy import poly, latex, sympify, nan
@@ -23,9 +23,10 @@ def hello():
             _polynomial = poly(_input)
             msg, sos = get_sos(_polynomial)
             if sos == nan:
-                flash(msg)
+                flash(Markup(f'<strong>Input</strong>: \({latex(sympify(_input))}\)'))
+                flash(Markup(f'<strong>Result</strong>: {msg}'))
             else:
-                flash(f'\({latex(sympify(_input))} = {get_latex_from_poly(sos)}\)')
+                flash(Markup(f'<strong>Result</strong>: \({latex(sympify(_input))} = {get_latex_from_poly(sos)}\)'))
         else:
             flash('Error: Non-constant polynomial required')
     return render_template('index.html', form=form)

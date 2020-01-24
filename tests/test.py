@@ -68,19 +68,19 @@ class TestGet_sos(TestCase):
     def test_get_sos_odd_0(self):
         polynomial = poly('x')
         status, sos = get_sos(polynomial)
-        self.assertEqual(status, 'Polynomial has odd degree. Not a sum of squares.')
+        self.assertEqual(status, 'One of the variables in the polynomial has odd degree. Not a sum of squares.')
         self.assertEqual(expand(sos.as_poly()), nan)
 
     def test_get_sos_odd_1(self):
         polynomial = poly('abc')
         status, sos = get_sos(polynomial)
-        self.assertEqual(status, 'Polynomial has odd degree. Not a sum of squares.')
+        self.assertEqual(status, 'One of the variables in the polynomial has odd degree. Not a sum of squares.')
         self.assertEqual(expand(sos.as_poly()), nan)
 
     def test_get_sos_odd_2(self):
         polynomial = poly('x**3 + 1')
         status, sos = get_sos(polynomial)
-        self.assertEqual(status, 'Polynomial has odd degree. Not a sum of squares.')
+        self.assertEqual(status, 'One of the variables in the polynomial has odd degree. Not a sum of squares.')
         self.assertEqual(sos, nan)
 
     def test_get_sos_1(self):
