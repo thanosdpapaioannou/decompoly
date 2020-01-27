@@ -112,7 +112,12 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
     if remainder == 1:
         _status = 'Exact SOS decomposition found.'
         sos = coeff_leading * max_even_divisor
+        return _status, sos
     else:
+        _status = 'No exact SOS decomposition found.'
+        sos = nan
+
+        # let's try clearing denominators
         _mult = get_special_sos_multiplier(remainder)
         for r in range(max_mult_power):
             print(f'Trying multiplier power: {r}')
@@ -120,8 +125,5 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
             if status_ == 'Exact SOS decomposition found.':
                 _status = status_
                 sos = (1 / _mult ** r) * coeff_leading * max_even_divisor * sos_.as_expr()
-                break
-        else:
-            _status = 'No exact SOS decomposition found.'
-            sos = nan
+                return _status, sos
     return _status, sos
