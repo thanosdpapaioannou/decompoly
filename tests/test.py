@@ -222,8 +222,7 @@ class TestGet_sos(TestCase):
     #     self.assertEqual(expand(sos.as_expr()), expand(polynomial).as_expr())
     #
     # def mildorf_2(self):
-    #     polynomial = poly('a**4*b**2 + b**4*a**2 + 1 - (a**
-    #     3*b**2 + b**3*a**2 + ab)')
+    #     polynomial = poly('a**4*b**2 + b**4*a**2 + 1 - (a**3*b**2 + b**3*a**2 + a*b)')
     #     status, sos = get_sos(polynomial)
     #     self.assertEqual(status, 'Exact SOS decomposition found.')
     #     self.assertEqual(expand(sos.as_expr()), expand(polynomial).as_expr()
