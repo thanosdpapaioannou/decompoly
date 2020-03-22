@@ -1,4 +1,4 @@
-from sympy import nan, degree_list, Matrix
+from sympy import nan, degree_list, Matrix, expand, factor_list
 from cvxopt import matrix, solvers
 import numpy as np
 
@@ -93,13 +93,18 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
         _status = 'Zero polynomial.'
         return _status, nan
     else:
-        _degree_list = degree_list(poly)
+        _poly_expanded = expand(poly)
+        _degree_list = degree_list(_poly_expanded)
+        _coeffs = _poly_expanded.coeffs()
         if np.all([_d == 0 for _d in _degree_list]):
             _status = 'Constant polynomial.'
             return _status, nan
         elif np.any([_d % 2 for _d in _degree_list]):
             _status = 'One of the variables in the polynomial has odd degree. Not a sum of squares.'
             return _status, nan
+        elif np.all([_d % 2 == 0 for _d in _degree_list]) and np.all([_f >= 0 for _f in _coeffs]):
+            _status = 'Exact SOS decomposition found.'
+            return _status, _poly_expanded
 
     indices = np.array(list(poly.as_dict().keys()))
     monoms = get_pts_in_cvx_hull(indices)
@@ -120,6 +125,7 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
         # let's try clearing denominators
         _mult = get_special_sos_multiplier(remainder)
         for r in range(max_mult_power):
+            # r=0
             print(f'Trying multiplier power: {r}')
             status_, sos_ = get_sos_helper(poly=(_mult ** r * remainder).as_poly(), epsilon=epsilon)
             if status_ == 'Exact SOS decomposition found.':

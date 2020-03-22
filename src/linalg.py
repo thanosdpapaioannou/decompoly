@@ -112,6 +112,7 @@ def form_sos(gram_mat_q, monom_vec):
     return sos
 
 
+# mat = indices
 def get_pts_in_cvx_hull(mat, tolerance=1e-03):
     """
     :param mat: matrix whose rows are integer lattice points,
