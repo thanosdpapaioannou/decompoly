@@ -14,16 +14,11 @@ DSDP_OPTIONS = {'show_progress': False, 'DSDP_Monitor': 5, 'DSDP_MaxIts': 1000, 
 def sdp_expl_solve(sym_mat_list, smallest_eig=0.001):
     """
     :param sym_mat_list: list of symmetric matrices G_0, G_1, ..., G_n of same size
-    :param smallest eig: parameter (default 0) may be set to small positive quantity to force non-degeneracy
-    :param objective: string parameter, either 'zero', or 'max_trace' (default 'zero'), determines
-    the objective in the SDP solver
-    :param dsdp_solver: string, default 'dsdp' to specify which solver sdp.solver uses
-    :param dsdp_options:
+    :param smallest_eig: parameter (default 0) may be set to small positive quantity to force non-degeneracy
     :return: solver_status, a string, either 'optimal', 'infeasible', or 'unknown', and sol_vec, a vector approximately
     optimizing the SDP problem if solver_status is 'optimal', and nan instead
     """
     obj_vec = -matrix(get_explicit_rep_objective(sym_mat_list))
-    # print(obj_vec)
     _hs = sym_mat_list[0] - smallest_eig * np.eye(sym_mat_list[0].shape[0])
     sym_grams = matrix(flatten(sym_mat_list[1:])).T
     sol = solvers.sdp(c=obj_vec, Gs=[-sym_grams], hs=[matrix(_hs)], solver='dsdp', options=DSDP_OPTIONS)
@@ -36,30 +31,32 @@ def sdp_expl_solve(sym_mat_list, smallest_eig=0.001):
         return 'unknown', nan
 
 
-def get_sos_helper(poly, epsilon=0.001, max_denom_rat_approx=100):
+def get_sos_helper(poly, epsilon=0.001, max_denom=100):
     """
     :param poly: sympy polynomial
     :param epsilon:
-    :param max_denom_rat_approx:
+    :param max_denom:
     :return: string with status whether poly is a sum of squares of polynomials, and a sympy expression that is
     the SOSRF decomposition of the poly
     """
-    indices = np.array(list(poly.as_dict().keys()))
+    # poly = polynomial
+    _dict = poly.as_dict()
+    indices = np.array(list(_dict.keys()))
     monoms = get_pts_in_cvx_hull(indices)
     sqroot_monoms = get_pts_in_cvx_hull(1 / 2 * indices)
-    coeffs = get_coeffs(poly)
+    coeffs = get_coeffs(_dict, monoms, sqroot_monoms)
     sym_mat_list_gram = get_explicit_form_basis(monoms, sqroot_monoms, coeffs)
     if len(sym_mat_list_gram) == 1:
         # Unique Gram matrix. No need for SDP.
-        gram_mat_q = get_rational_approximation(sym_mat_list_gram[0], max_denom_rat_approx)
+        gram_mat_q = get_rational_approximation(sym_mat_list_gram[0], max_denom)
         psd_status = is_symmetric_and_positive_definite(np.vectorize(float)(gram_mat_q))
         if not psd_status:
             status_ = 'Unique Gram matrix not PSD. Not a sum of squares.'
             return status_, nan
     else:
-        _status, sol_vec = sdp_expl_solve(sym_mat_list_gram, smallest_eig=epsilon)
+        _status, sol_vec = sdp_expl_solve(sym_mat_list=sym_mat_list_gram, smallest_eig=epsilon)
         if _status == 'Optimal solution found':
-            gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom_rat_approx)
+            gram_mat_q = form_rat_gram_mat(sym_mat_list_gram, sol_vec, max_denom=max_denom)
         else:
             status_ = 'Not an exact Gram matrix.'
             return status_, nan
@@ -76,6 +73,7 @@ def get_sos_helper(poly, epsilon=0.001, max_denom_rat_approx=100):
     return status_, sos
 
 
+# poly = polynomial
 def get_sos(poly, max_mult_power=3, epsilon=0.001):
     """
     :param poly: sympy polynomial
@@ -102,7 +100,7 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
         elif np.any([_d % 2 for _d in _degree_list]):
             _status = 'One of the variables in the polynomial has odd degree. Not a sum of squares.'
             return _status, nan
-        elif np.all([_d % 2 == 0 for _d in _degree_list]) and np.all([_f >= 0 for _f in _coeffs]):
+        elif np.all([_f >= 0 for _f in _coeffs]):
             _status = 'Exact SOS decomposition found.'
             return _status, _poly_expanded
 
@@ -125,7 +123,7 @@ def get_sos(poly, max_mult_power=3, epsilon=0.001):
         # let's try clearing denominators
         _mult = get_special_sos_multiplier(remainder)
         for r in range(max_mult_power):
-            # r=0
+            # r=1
             print(f'Trying multiplier power: {r}')
             status_, sos_ = get_sos_helper(poly=(_mult ** r * remainder).as_poly(), epsilon=epsilon)
             if status_ == 'Exact SOS decomposition found.':
